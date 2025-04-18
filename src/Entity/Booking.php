@@ -3,75 +3,146 @@
 namespace App\Entity;
 
 use App\Repository\BookingRepository;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: BookingRepository::class)]
 class Booking
 {
-#[ORM\Id]
-#[ORM\GeneratedValue(strategy: "AUTO")]
-#[ORM\Column(type: "integer")]
-private int $id;
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column]
+    private ?int $id = null;
 
-#[ORM\Column(length: 15, nullable: true)]
-private ?string $phoneNumber = null;
+    #[ORM\ManyToOne(inversedBy: 'bookings')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?House $house = null;
 
-#[ORM\Column(nullable: true)]
-private ?int $houseId = null;
+    #[ORM\Column(length: 255)]
+    private ?string $clientName = null;
 
-#[ORM\Column(length: 255, nullable: true)]
-private ?string $comment = null;
+    #[ORM\Column(length: 255)]
+    private ?string $clientEmail = null;
 
-public function __construct(
-int $id,
-?string $phoneNumber = null,
-?int $houseId = null,
-?string $comment = null
-) {
-$this->id = $id;
-$this->phoneNumber = $phoneNumber;
-$this->houseId = $houseId;
-$this->comment = $comment;
-}
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $clientPhone = null;
 
-public function getId(): int
-{
-return $this->id;
-}
+    #[ORM\Column(type: Types::DATE_MUTABLE)]
+    private ?\DateTimeInterface $checkInDate = null;
 
-public function getPhoneNumber(): ?string
-{
-return $this->phoneNumber;
-}
+    #[ORM\Column(type: Types::DATE_MUTABLE)]
+    private ?\DateTimeInterface $checkOutDate = null;
 
-public function setPhoneNumber(?string $phoneNumber): static
-{
-$this->phoneNumber = $phoneNumber;
+    #[ORM\Column]
+    private ?int $numberOfGuests = null;
 
-return $this;
-}
+    #[ORM\Column]
+    private ?float $totalPrice = null;
 
-public function getHouseId(): ?int
-{
-return $this->houseId;
-}
+    #[ORM\Column(length: 20)]
+    private ?string $status = 'pending';
 
-public function setHouseId(?int $houseId): static
-{
-$this->houseId = $houseId;
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
 
-return $this;
-}
+    public function getHouse(): ?House
+    {
+        return $this->house;
+    }
 
-public function getComment(): ?string
-{
-return $this->comment;
-}
+    public function setHouse(?House $house): static
+    {
+        $this->house = $house;
+        return $this;
+    }
 
-public function setComment(?string $comment): static
-{
-$this->comment = $comment;
+    public function getClientName(): ?string
+    {
+        return $this->clientName;
+    }
 
-return $this;
-}
+    public function setClientName(string $clientName): static
+    {
+        $this->clientName = $clientName;
+        return $this;
+    }
+
+    public function getClientEmail(): ?string
+    {
+        return $this->clientEmail;
+    }
+
+    public function setClientEmail(string $clientEmail): static
+    {
+        $this->clientEmail = $clientEmail;
+        return $this;
+    }
+
+    public function getClientPhone(): ?string
+    {
+        return $this->clientPhone;
+    }
+
+    public function setClientPhone(?string $clientPhone): static
+    {
+        $this->clientPhone = $clientPhone;
+        return $this;
+    }
+
+    public function getCheckInDate(): ?\DateTimeInterface
+    {
+        return $this->checkInDate;
+    }
+
+    public function setCheckInDate(\DateTimeInterface $checkInDate): static
+    {
+        $this->checkInDate = $checkInDate;
+        return $this;
+    }
+
+    public function getCheckOutDate(): ?\DateTimeInterface
+    {
+        return $this->checkOutDate;
+    }
+
+    public function setCheckOutDate(\DateTimeInterface $checkOutDate): static
+    {
+        $this->checkOutDate = $checkOutDate;
+        return $this;
+    }
+
+    public function getNumberOfGuests(): ?int
+    {
+        return $this->numberOfGuests;
+    }
+
+    public function setNumberOfGuests(int $numberOfGuests): static
+    {
+        $this->numberOfGuests = $numberOfGuests;
+        return $this;
+    }
+
+    public function getTotalPrice(): ?float
+    {
+        return $this->totalPrice;
+    }
+
+    public function setTotalPrice(float $totalPrice): static
+    {
+        $this->totalPrice = $totalPrice;
+        return $this;
+    }
+
+    public function getStatus(): ?string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): static
+    {
+        $this->status = $status;
+        return $this;
+    }
 }

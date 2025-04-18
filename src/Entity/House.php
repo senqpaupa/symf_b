@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\HouseRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: HouseRepository::class)]
@@ -12,24 +14,28 @@ use Doctrine\ORM\Mapping as ORM;
 class House
 {
     #[ORM\Id]
-    #[ORM\GeneratedValue(strategy: "AUTO")]
-    #[ORM\Column(type: "integer")]
-    private int $id;
+    #[ORM\GeneratedValue]
+    #[ORM\Column]
+    private ?int $id = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $address = null;
+    #[ORM\Column(length: 255)]
+    private ?string $name = null;
 
-    #[ORM\Column(nullable: true)]
-    private ?int $price = null;
+    #[ORM\Column(length: 1000, nullable: true)]
+    private ?string $description = null;
 
-    public function __construct(
-        int $id,
-        ?string $address = null,
-        ?int $price = null
-    ) {
-        $this->id = $id;
-        $this->address = $address;
-        $this->price = $price;
+    #[ORM\Column]
+    private ?float $pricePerNight = null;
+
+    #[ORM\Column]
+    private ?int $capacity = null;
+
+    #[ORM\OneToMany(mappedBy: 'house', targetEntity: Booking::class)]
+    private Collection $bookings;
+
+    public function __construct()
+    {
+        $this->bookings = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -37,27 +43,74 @@ class House
         return $this->id;
     }
 
-    public function getAddress(): ?string
+    public function getName(): ?string
     {
-        return $this->address;
+        return $this->name;
     }
 
-    public function setAddress(?string $address): static
+    public function setName(string $name): static
     {
-        $this->address = $address;
-
+        $this->name = $name;
         return $this;
     }
 
-    public function getPrice(): ?int
+    public function getDescription(): ?string
     {
-        return $this->price;
+        return $this->description;
     }
 
-    public function setPrice(?int $price): static
+    public function setDescription(?string $description): static
     {
-        $this->price = $price;
+        $this->description = $description;
+        return $this;
+    }
 
+    public function getPricePerNight(): ?float
+    {
+        return $this->pricePerNight;
+    }
+
+    public function setPricePerNight(float $pricePerNight): static
+    {
+        $this->pricePerNight = $pricePerNight;
+        return $this;
+    }
+
+    public function getCapacity(): ?int
+    {
+        return $this->capacity;
+    }
+
+    public function setCapacity(int $capacity): static
+    {
+        $this->capacity = $capacity;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Booking>
+     */
+    public function getBookings(): Collection
+    {
+        return $this->bookings;
+    }
+
+    public function addBooking(Booking $booking): static
+    {
+        if (!$this->bookings->contains($booking)) {
+            $this->bookings->add($booking);
+            $booking->setHouse($this);
+        }
+        return $this;
+    }
+
+    public function removeBooking(Booking $booking): static
+    {
+        if ($this->bookings->removeElement($booking)) {
+            if ($booking->getHouse() === $this) {
+                $booking->setHouse(null);
+            }
+        }
         return $this;
     }
 }
