@@ -1,0 +1,6 @@
+id,name,amenities,beds,row_from_sea,is_booked
+1,"Прибрежный","toilet,shower",3,1,false
+2,"Уютный","toilet",2,2,false
+3,"Простой","none",2,3,false
+4,"Премиум","toilet,shower,kitchen",4,1,false
+5,"Стандарт","toilet",3,2,true

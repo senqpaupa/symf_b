@@ -1,0 +1,6 @@
+id,name,amenities,beds,row_from_sea,is_booked
+1,"Морской бриз","toilet,shower",4,1,false
+2,"Песчаный","toilet",2,1,false
+3,"Эконом","none",2,2,false
+4,"Люкс","toilet,shower,kitchen",6,1,true
+5,"Семейный","toilet,shower",4,2,false
