@@ -2,175 +2,155 @@
 
 namespace App\Tests\Service;
 
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-
+use App\Entity\Booking;
+use App\Entity\House;
 use App\Service\BookingService;
-use App\Service\SummerHouseService;
-
-use App\Dto\BookingDto;
+use App\Service\HouseService;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 class BookingServiceTest extends KernelTestCase
 {
-    public function testGetBookings(): void
+    private ?EntityManagerInterface $entityManager = null;
+    private ?BookingService $bookingService = null;
+    private ?HouseService $houseService = null;
+    private ?House $testHouse = null;
+
+    protected function setUp(): void
     {
-        $kernel = self::bootKernel();
-
-        $this->assertSame('test', $kernel->getEnvironment());
-
-        $testCsvFile = '/tests/csv/bookings_1.csv';
-
-        $bookingService = new BookingService($kernel->getProjectDir(), $testCsvFile);
-
-        try {
-            /**
-             * @var BookingDto[] $bookings
-             */
-            $bookings = $bookingService->getBookings();
-        } catch (\Exception $e) {
-            $this->fail('Failed to get bookings: ' . $e->getMessage());
-        }
-
-        $this->assertIsArray($bookings);
-
-        for ($i = 0; $i < count($bookings); $i++) {
-            $this->assertInstanceOf(BookingDto::class, $bookings[$i]);
-        }
+        $kernel = self::bootKernel(['environment' => 'test']);
+        $this->entityManager = $kernel->getContainer()->get('doctrine')->getManager();
+        
+        $this->entityManager->getConnection()->executeQuery('TRUNCATE house, booking CASCADE');
+        
+        $this->bookingService = new BookingService($this->entityManager);
+        $this->houseService = new HouseService($this->entityManager);
+        
+        $this->testHouse = $this->houseService->createHouse(
+            'Тестовый домик',
+            100.0,
+            4,
+            'Описание тестового домика'
+        );
+        
+        $this->entityManager->flush();
     }
 
-    public function testSaveBookings(): void
+    public function testCreateBooking(): void
     {
-        $kernel = self::bootKernel();
+        $booking = $this->bookingService->createBooking(
+            $this->testHouse,
+            'Иван Иванов',
+            'ivan@example.com',
+            new \DateTime('2024-06-01'),
+            new \DateTime('2024-06-05'),
+            2,
+            '+7 999 123 45 67'
+        );
 
-        $this->assertSame('test', $kernel->getEnvironment());
+        $this->assertNotNull($booking->getId());
+        $this->assertEquals($this->testHouse->getId(), $booking->getHouse()->getId());
+        $this->assertEquals('Иван Иванов', $booking->getClientName());
+        $this->assertEquals('ivan@example.com', $booking->getClientEmail());
+        $this->assertEquals('+7 999 123 45 67', $booking->getClientPhone());
+        $this->assertEquals(2, $booking->getNumberOfGuests());
+        $this->assertEquals(400.0, $booking->getTotalPrice());
 
-
-        $testCsvFile = '/tests/csv/bookings_2.csv';
-
-        $bookingService = new BookingService($kernel->getProjectDir(), $testCsvFile);
-
-
-        $testSHCsvFile_WA = $kernel->getProjectDir() . '/tests/csv/summerhouses_1.csv';
-
-        $testSHSCsvFile_OK = $kernel->getProjectDir() . '/tests/csv/summerhouses_2.csv';
-
-        /**
-         * @var SummerHouseService $summerHouseService_WA
-         */
-        $summerHouseService_WA = new SummerHouseService($kernel->getProjectDir(), $testSHCsvFile_WA);
-
-        /**
-         * @var SummerHouseService $summerHouseService_OK
-         */
-        $summerHouseService_OK = new SummerHouseService($kernel->getProjectDir(), $testSHSCsvFile_OK);
-
-        /**
-         * @var BookingDto[] $newBookings
-         */
-        $newBookings = [
-            new BookingDto(
-                id: -1,
-                phoneNumber: '123456789',
-                houseId: 1,
-                comment: 'test'
-            ),
-            new BookingDto(
-                id: -1,
-                phoneNumber: '987654321',
-                houseId: 2,
-                comment: 'test'
-            ),
-            new BookingDto(
-                id: -1,
-                phoneNumber: '123456789',
-                houseId: 3,
-                comment: 'test'
-            ),
-        ];
-
-        $this->expectException(\Exception::class);
-        $bookingService->saveBookings($summerHouseService_WA, $newBookings, true,);
-
-        try {
-            $bookingService->saveBookings($summerHouseService_OK, $newBookings, true,);
-        } catch (\Exception $e) {
-            $this->fail('Failed to save bookings: ' . $e->getMessage());
-        }
-
-        try {
-            /**
-             * @var BookingDto[] $bookings
-             */
-            $bookings = $bookingService->getBookings();
-        } catch (\Exception $e) {
-            $this->fail('Failed to get bookings: ' . $e->getMessage());
-        }
-
-        $this->assertCount(count($newBookings), $bookings);
+        $savedBooking = $this->entityManager->getRepository(Booking::class)->find($booking->getId());
+        $this->assertNotNull($savedBooking);
+        $this->assertEquals($booking->getClientName(), $savedBooking->getClientName());
     }
 
-    public function testUniqueIds(): void
+    public function testGetBookingsByHouse(): void
     {
-        $kernel = self::bootKernel();
+        $booking1 = $this->bookingService->createBooking(
+            $this->testHouse,
+            'Клиент 1',
+            'client1@example.com',
+            new \DateTime('2024-07-01'),
+            new \DateTime('2024-07-05'),
+            2
+        );
 
-        $this->assertSame('test', $kernel->getEnvironment());
+        $booking2 = $this->bookingService->createBooking(
+            $this->testHouse,
+            'Клиент 2',
+            'client2@example.com',
+            new \DateTime('2024-07-10'),
+            new \DateTime('2024-07-15'),
+            3
+        );
 
-        $testCsvFile = '/tests/csv/bookings_2.csv';
+        $this->entityManager->flush();
 
-        $bookingService = new BookingService($kernel->getProjectDir(), $testCsvFile);
+        $bookings = $this->bookingService->getBookingsByHouse($this->testHouse);
 
-        $testSHSCsvFile_OK = '/tests/csv/summerhouses_2.csv';
+        $this->assertCount(2, $bookings);
+        $this->assertContainsEquals($booking1, $bookings);
+        $this->assertContainsEquals($booking2, $bookings);
+    }
 
-        /**
-         * @var SummerHouseService $summerHouseService_OK
-         */
-        $summerHouseService_OK = new SummerHouseService($kernel->getProjectDir(), $testSHSCsvFile_OK);
+    public function testIsHouseAvailable(): void
+    {
+        $this->bookingService->createBooking(
+            $this->testHouse,
+            'Тест',
+            'test@example.com',
+            new \DateTime('2024-08-01'),
+            new \DateTime('2024-08-05'),
+            2
+        );
 
-        /**
-         * @var BookingDto[] $newBookings
-         */
-        $newBookings = [
-            new BookingDto(
-                id: -1,
-                phoneNumber: '123456789',
-                houseId: 1,
-                comment: 'test'
-            ),
-            new BookingDto(
-                id: -1,
-                phoneNumber: '987654321',
-                houseId: 2,
-                comment: 'test'
-            ),
-            new BookingDto(
-                id: -1,
-                phoneNumber: '123456789',
-                houseId: 3,
-                comment: 'test'
-            ),
-        ];
+        $this->entityManager->flush();
 
+        $this->assertTrue($this->bookingService->isHouseAvailable(
+            $this->testHouse,
+            new \DateTime('2024-07-01'),
+            new \DateTime('2024-07-05')
+        ));
 
-        try {
-            $bookingService->saveBookings($summerHouseService_OK, $newBookings);
-        } catch (\Exception $e) {
-            $this->fail('Failed to save bookings: ' . $e->getMessage());
+        $this->assertFalse($this->bookingService->isHouseAvailable(
+            $this->testHouse,
+            new \DateTime('2024-08-03'),
+            new \DateTime('2024-08-07')
+        ));
+
+        $this->assertTrue($this->bookingService->isHouseAvailable(
+            $this->testHouse,
+            new \DateTime('2024-08-06'),
+            new \DateTime('2024-08-10')
+        ));
+    }
+
+    public function testCancelBooking(): void
+    {
+        $booking = $this->bookingService->createBooking(
+            $this->testHouse,
+            'Тест',
+            'test@example.com',
+            new \DateTime('2024-09-01'),
+            new \DateTime('2024-09-05'),
+            2
+        );
+
+        $this->entityManager->flush();
+
+        $this->bookingService->cancelBooking($booking);
+
+        $this->assertEquals('cancelled', $booking->getStatus());
+
+        $this->entityManager->clear();
+        $savedBooking = $this->entityManager->getRepository(Booking::class)->find($booking->getId());
+        $this->assertEquals('cancelled', $savedBooking->getStatus());
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->entityManager) {
+            $this->entityManager->getConnection()->executeQuery('TRUNCATE house, booking CASCADE');
+            $this->entityManager->close();
+            $this->entityManager = null;
         }
-
-        try {
-            /**
-             * @var BookingDto[] $bookings
-             */
-            $bookings = $bookingService->getBookings();
-        } catch (\Exception $e) {
-            $this->fail('Failed to get bookings: ' . $e->getMessage());
-        }
-
-        $ids = [];
-
-        for ($i = 0; $i < count($bookings); $i++) {
-            $ids[] = $bookings[$i]->id;
-        }
-
-        $this->assertCount(count($ids), array_unique($ids));
+        parent::tearDown();
     }
 }

@@ -2,137 +2,63 @@
 
 namespace App\Service;
 
-use App\Dto\BookingDto;
-use App\Service\SummerHouseService;
+use App\Entity\Booking;
+use App\Entity\House;
+use Doctrine\ORM\EntityManagerInterface;
 
 class BookingService
 {
-    /**
-     * @var string
-     */
-    private string $csvFilePath;
+    private EntityManagerInterface $entityManager;
 
-    public function __construct(string $projectDir, string $csvFilePath)
+    public function __construct(EntityManagerInterface $entityManager)
     {
-        $this->csvFilePath = $projectDir . $csvFilePath;
+        $this->entityManager = $entityManager;
     }
 
-    /**
-     * @return int
-     */
-    private function getLastId(): int
-    {
-        try {
-            $bookings = $this->getBookings();
-        } catch (\Exception $e) {
-            throw new \Exception('Failed to get bookings: ' . $e->getMessage());
-        }
+    public function createBooking(
+        House $house,
+        string $clientName,
+        string $clientEmail,
+        \DateTimeInterface $checkInDate,
+        \DateTimeInterface $checkOutDate,
+        int $numberOfGuests,
+        ?string $clientPhone = null
+    ): Booking {
+        $booking = new Booking();
+        $booking->setHouse($house);
+        $booking->setClientName($clientName);
+        $booking->setClientEmail($clientEmail);
+        $booking->setClientPhone($clientPhone);
+        $booking->setCheckInDate($checkInDate);
+        $booking->setCheckOutDate($checkOutDate);
+        $booking->setNumberOfGuests($numberOfGuests);
+        
+        // Рассчитываем общую стоимость
+        $nights = $checkInDate->diff($checkOutDate)->days;
+        $totalPrice = $house->getPricePerNight() * $nights;
+        $booking->setTotalPrice($totalPrice);
 
+        $this->entityManager->persist($booking);
+        $this->entityManager->flush();
 
-        $lastId = 0;
-
-        foreach ($bookings as $booking) {
-            if ($booking->id > $lastId) {
-                $lastId = $booking->id;
-            }
-        }
-
-        return $lastId;
+        return $booking;
     }
 
-    /**
-     * @param int $id
-     * @return bool
-     */
-    public function isIdExists(int $id): bool
+    public function getBookingsByHouse(House $house): array
     {
-        try {
-            $bookings = $this->getBookings();
-        } catch (\Exception $e) {
-            throw new \Exception('Failed to get bookings: ' . $e->getMessage());
-        }
-
-        foreach ($bookings as $booking) {
-            if ($booking->id === $id) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->entityManager->getRepository(Booking::class)
+            ->findBy(['house' => $house], ['checkInDate' => 'ASC']);
     }
 
-    /**
-     * @return BookingDto[]
-     */
-    public function getBookings(): array
+    public function isHouseAvailable(House $house, \DateTimeInterface $checkIn, \DateTimeInterface $checkOut): bool
     {
-        /**
-         * @var BookingDto[] $bookings
-         */
-        $bookings = [];
-
-        $file = fopen($this->csvFilePath, 'r');
-
-        if ($file === false) {
-            throw new \RuntimeException('Failed to open file: ' . $this->csvFilePath);
-        }
-
-        while (($data = fgetcsv($file, escape: '\\')) !== false) {
-            if ($data !== null) {
-                $bookings[] = new BookingDto(
-                    (int)$data[0],
-                    $data[1],
-                    (int)$data[2],
-                    $data[3]
-                );
-            }
-        }
-        fclose($file);
-
-        return $bookings;
+        return $this->entityManager->getRepository(Booking::class)
+            ->isHouseAvailable($house, $checkIn, $checkOut);
     }
 
-    /**
-     * @param BookingDto[] $bookings
-     * @param bool $rewrite
-     * @return void
-     */
-    public function saveBookings(SummerHouseService $summerHouseService, array $bookings, bool $rewrite = false): void
+    public function cancelBooking(Booking $booking): void
     {
-        for ($i = 0; $i < count($bookings); $i++) {
-            if (!$summerHouseService->isHouseIdExists($bookings[$i]->houseId)) {
-                throw new \Exception('House ID ' . $bookings[$i]->houseId . ' does not exist.');
-            }
-        }
-
-        /**
-         * @var int $startId
-         */
-        $startId = -1;
-
-        if ($rewrite === false) {
-            try {
-                $startId = $this->getLastId();
-            } catch (\Exception $e) {
-                throw new \Exception('Failed to get last ID: ' . $e->getMessage());
-            }
-        }
-
-        $file = fopen($this->csvFilePath, $rewrite ? 'w' : 'a');
-
-        if ($file === false) {
-            throw new \RuntimeException('Failed to open file: ' . $this->csvFilePath);
-        }
-
-        foreach ($bookings as $booking) {
-            fputcsv($file, [
-                ++$startId,
-                $booking->phoneNumber,
-                $booking->houseId,
-                $booking->comment
-            ], escape: '\\');
-        }
-
-        fclose($file);
+        $booking->setStatus('cancelled');
+        $this->entityManager->flush();
     }
 }
